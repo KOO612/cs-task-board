@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-csuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cspass}
+      POSTGRES_DB: ${POSTGRES_DB:-csdb}
+    volumes:
+      - csdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-csuser} -d ${POSTGRES_DB:-csdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-csuser}:${POSTGRES_PASSWORD:-cspass}@db:5432/${POSTGRES_DB:-csdb}
+      PORT: 3000
+    ports:
+      # 브라우저가 막는 포트(6000 등)는 피하세요. 8080 권장.
+      - "${APP_PORT:-8080}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  csdata:

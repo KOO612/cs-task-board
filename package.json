@@ -1,0 +1,13 @@
+{
+  "name": "cs-response-service",
+  "version": "1.0.0",
+  "description": "고객사 CS 응대 기록 서비스",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

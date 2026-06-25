@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>고객 CS 응대 기록</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark">CS</span>
+      <div class="brand__text">
+        <span class="brand__eyebrow">support / tickets</span>
+        <h1 class="brand__title">고객 CS 응대 기록</h1>
+      </div>
+    </div>
+
+    <div class="stats" id="stats" aria-label="현황 요약">
+      <button class="stat" data-status="" aria-pressed="true"><span class="stat__num" id="stat-all">0</span><span class="stat__label">전체</span></button>
+      <button class="stat" data-status="received"><span class="stat__num" id="stat-received">0</span><span class="stat__label">접수</span></button>
+      <button class="stat" data-status="in_progress"><span class="stat__num" id="stat-in_progress">0</span><span class="stat__label">처리중</span></button>
+      <button class="stat" data-status="done"><span class="stat__num" id="stat-done">0</span><span class="stat__label">완료</span></button>
+      <button class="stat" data-status="hold"><span class="stat__num" id="stat-hold">0</span><span class="stat__label">보류</span></button>
+    </div>
+
+    <button class="btn btn--primary" id="new-btn">+ 새 응대 기록</button>
+  </header>
+
+  <section class="toolbar">
+    <div class="viewtoggle" role="tablist" aria-label="보기 전환">
+      <button class="viewtoggle__btn is-active" id="view-list" data-view="list">목록</button>
+      <button class="viewtoggle__btn" id="view-board" data-view="board">보드</button>
+    </div>
+    <div class="toolbar__search">
+      <input type="search" id="search" placeholder="고객사 · 제목 · 문의/해결 내용 · 담당자 검색" autocomplete="off" />
+    </div>
+    <div class="toolbar__filters">
+      <select id="filter-customer" aria-label="고객사 필터"><option value="">고객사 전체</option></select>
+      <select id="filter-priority" aria-label="중요도 필터">
+        <option value="">중요도 전체</option>
+        <option value="high">높음</option>
+        <option value="medium">보통</option>
+        <option value="low">낮음</option>
+      </select>
+      <select id="filter-channel" aria-label="접수경로 필터">
+        <option value="">경로 전체</option>
+        <option value="phone">전화</option>
+        <option value="email">이메일</option>
+        <option value="chat">채팅</option>
+        <option value="visit">방문</option>
+        <option value="other">기타</option>
+      </select>
+      <select id="filter-assignee" aria-label="담당자 필터"><option value="">담당자 전체</option></select>
+      <select id="sort" aria-label="정렬">
+        <option value="created_desc">등록 최신순</option>
+        <option value="created_asc">등록 오래된순</option>
+        <option value="occurred_desc">발생 최신순</option>
+        <option value="occurred_asc">발생 오래된순</option>
+        <option value="priority">중요도순</option>
+        <option value="open_first">미해결 우선</option>
+      </select>
+      <a class="btn btn--ghost" id="csv-btn" href="/api/tickets/export.csv">CSV 내보내기</a>
+    </div>
+  </section>
+
+  <main class="board">
+    <!-- 목록(테이블) 뷰 -->
+    <div class="table" id="table" role="table" aria-label="응대 기록 목록">
+      <div class="thead" role="row">
+        <span role="columnheader" class="col-customer">고객사 / 제목</span>
+        <span role="columnheader" class="col-assignee">담당자</span>
+        <span role="columnheader" class="col-time">발생 → 해결</span>
+        <span role="columnheader" class="col-status">처리상태</span>
+        <span role="columnheader" class="col-summary">내용</span>
+        <span role="columnheader" class="col-actions"></span>
+      </div>
+      <div id="rows"></div>
+    </div>
+
+    <!-- 보드(칸반) 뷰 -->
+    <div class="kanban" id="kanban" hidden></div>
+
+    <div class="empty" id="empty" hidden>
+      <p class="empty__title">표시할 기록이 없습니다</p>
+      <p class="empty__sub">오른쪽 위 <b>+ 새 응대 기록</b>으로 첫 기록을 남겨보세요.</p>
+    </div>
+  </main>
+
+  <!-- 입력 패널 (오른쪽 드로어) -->
+  <div class="drawer" id="drawer" hidden>
+    <div class="drawer__scrim" data-close></div>
+    <aside class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <header class="drawer__head">
+        <h2 id="drawer-title">새 응대 기록</h2>
+        <button class="iconbtn" data-close aria-label="닫기">✕</button>
+      </header>
+
+      <div class="drawer__body">
+        <div class="form">
+          <input type="hidden" id="f-id" />
+
+          <label class="field">
+            <span class="field__label">고객사 <em>*</em></span>
+            <input type="text" id="f-customer" list="customer-list" placeholder="예) 가나상사" maxlength="120" autocomplete="off" />
+            <datalist id="customer-list"></datalist>
+            <span class="field__error" id="err-customer"></span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">문의자 (고객 측)</span>
+            <input type="text" id="f-contact" placeholder="예) 박과장" maxlength="80" autocomplete="off" />
+          </label>
+
+          <label class="field field--full">
+            <span class="field__label">제목 / 요약</span>
+            <input type="text" id="f-title" placeholder="예) 로그인 후 화면이 멈춤" maxlength="200" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span class="field__label">접수 경로</span>
+            <select id="f-channel">
+              <option value="phone" selected>전화</option>
+              <option value="email">이메일</option>
+              <option value="chat">채팅</option>
+              <option value="visit">방문</option>
+              <option value="other">기타</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field__label">유형</span>
+            <input type="text" id="f-category" list="category-list" placeholder="예) 장애, 문의, 기능요청" maxlength="60" autocomplete="off" />
+            <datalist id="category-list"></datalist>
+          </label>
+
+          <label class="field">
+            <span class="field__label">중요도</span>
+            <select id="f-priority">
+              <option value="high">높음</option>
+              <option value="medium" selected>보통</option>
+              <option value="low">낮음</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field__label">처리 상태</span>
+            <select id="f-status">
+              <option value="received" selected>접수</option>
+              <option value="in_progress">처리중</option>
+              <option value="done">완료</option>
+              <option value="hold">보류</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field__label">담당자 (내부)</span>
+            <input type="text" id="f-assignee" list="assignee-list" placeholder="예) 김상담" maxlength="60" autocomplete="off" />
+            <datalist id="assignee-list"></datalist>
+          </label>
+
+          <label class="field">
+            <span class="field__label">발생 / 접수 일시</span>
+            <input type="datetime-local" id="f-occurred" />
+          </label>
+
+          <label class="field">
+            <span class="field__label">해결 일시</span>
+            <div class="inline-field">
+              <input type="datetime-local" id="f-resolved" />
+              <button type="button" class="btn btn--ghost btn--sm" id="resolved-now">지금</button>
+            </div>
+          </label>
+
+          <label class="field field--full">
+            <span class="field__label">문의 내용</span>
+            <textarea id="f-content" rows="3" placeholder="고객이 문의/접수한 내용" maxlength="4000"></textarea>
+          </label>
+
+          <label class="field field--full">
+            <span class="field__label">해결 내용</span>
+            <textarea id="f-resolution" rows="3" placeholder="어떻게 처리/해결했는지" maxlength="4000"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <footer class="drawer__foot">
+        <button class="btn btn--danger" id="delete-btn" hidden>삭제</button>
+        <span class="spacer"></span>
+        <button class="btn btn--ghost" data-close>취소</button>
+        <button class="btn btn--primary" id="save-btn">저장</button>
+      </footer>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
